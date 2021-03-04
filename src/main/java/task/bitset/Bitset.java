@@ -7,46 +7,59 @@ public class Bitset {
     private int size;
 
     public Bitset() {
-        size = 32;
-        bits = new int[32];
+        size = 1;
+        bits = new int[1];
     }
 
-    public Bitset(int size) {
-        if (size < 0 || size > 32) throw new IllegalArgumentException("Invalid array length value");
-        this.size = size;
+    public Bitset(int amount) {
+        if (amount < 0) throw new IllegalArgumentException("Invalid array length value");
+        if ((amount & 0x1f) != 0) size = 1;
+        size += amount >>> 5;
         bits = new int[size];
     }
 
     public Bitset(int[] arr) {
         sort(arr);
-        size = arr[arr.length - 1] + 1;
+        int max = arr[arr.length - 1] + 1;
+        if (max < 0) throw new IllegalArgumentException("Invalid array length value");
+        if ((max & 0x1f) != 0) size = 1;
+        size += max >>> 5;
         bits = new int[size];
         for (int j : arr) {
-            bits[j] = 1;
+            set(j);
         }
     }
 
     public void set(int index) {
-        checkIndex(index);
-        bits[index] = 1;
+        int ind = index >> 5;
+        checkIndex(ind);
+        bits[ind] |= 1 << index;
     }
 
     public void set(int index, boolean v) {
-        checkIndex(index);
-        if (v) bits[index] = 1;
-        else bits[index] = 0;
+        if (v) set(index);
+        else delete(index);
     }
 
     public void delete(int index) {
-        checkIndex(index);
-        bits[index] = 0;
+        int ind = index >> 5;
+        checkIndex(ind);
+        bits[ind] &= ~(1 << index);
     }
 
     public void delete(int start, int end) {
-        checkIndex(start); checkIndex(end);
-        if (start > end) throw new IllegalArgumentException("Invalid input data");
-        for (int i = start; i <= end; i++) {
-            bits[i] = 0;
+        if (start < 0 || start > end) throw new IllegalArgumentException("Invalid input data");
+        int startInd = start >> 5;
+        int endInd = end >> 5;
+        checkIndex(endInd);
+        if (startInd != endInd) {
+            for (int i = startInd; i < endInd; i++) {
+                bits[i] = 0;
+            }
+            bits[endInd] &= -1 << end + 1;
+            bits[startInd] &= (1 << start) - 1;
+        } else {
+            bits[startInd] &= (-1 << end + 1) | ((1 << start) - 1);
         }
     }
 
@@ -57,39 +70,20 @@ public class Bitset {
     }
 
     public Bitset intersection(Bitset bitset) {
-        StringBuilder s = new StringBuilder();
-        int minLength = Math.min(length(), bitset.length());
-        for (int i = 0; i < minLength; i++) {
-            if (bits[i] == 1 && bitset.bits[i] == 1) {
-                s.append(i).append(" ");
-            }
+        int i = Math.min(length(), bitset.length()) - 1;
+        for (; i >= 0 && (bits[i] & bitset.bits[i]) == 0; i--) ;
+        Bitset res = new Bitset(i + 1);
+        for (int j = i; j >= 0; j--) {
+            res.bits[i] = bits[i] & bitset.bits[i];
         }
-        if (s.length() == 0) return new Bitset(0);
-        String[] split = s.toString().split(" ");
-        Bitset res = new Bitset(Integer.parseInt(split[split.length - 1]) + 1);
-        for (int i = 0; i < split.length - 1; i++) {
-            res.bits[Integer.parseInt(split[i])] = 1;
-        }
-        res.bits[res.size - 1] = 1;
         return res;
     }
 
     public Bitset union(Bitset bitset) {
-        int lengthThis = length();
-        int lengthBitset = bitset.length();
-        int minLength = Math.min(lengthThis, lengthBitset);
-        Bitset res = new Bitset(Math.max(lengthThis, lengthBitset));
-        for (int i = 0; i < minLength; i++) {
-            if (bits[i] == 1 || bitset.bits[i] == 1) res.bits[i] = 1;
-        }
-        if (lengthBitset == minLength) {
-            for (int i = minLength; i < lengthThis; i++) {
-                if (bits[i] == 1) res.bits[i] = 1;
-            }
-        } else {
-            for (int i = minLength; i < lengthBitset; i++) {
-                if (bitset.bits[i] == 1) res.bits[i] = 1;
-            }
+        int maxLength = Math.max(length(), bitset.length());
+        Bitset res = new Bitset(maxLength);
+        for (int i = maxLength - 1; i >= 0; i--) {
+            res.bits[i] = bits[i] | bitset.bits[i];
         }
         return res;
     }
@@ -97,25 +91,28 @@ public class Bitset {
     public Bitset complement(Bitset bitset) {
         int lengthThis = length();
         int lengthBitset = bitset.length();
-        if (lengthThis > lengthBitset) {
+        if (lengthThis > lengthBitset ||
+                (lengthThis != 0 && lengthBitset != 0 && bits[lengthThis - 1] > bitset.bits[lengthBitset - 1])) {
             throw new IllegalArgumentException("The first bitset is not a subset of the second");
         }
         Bitset res = new Bitset(lengthBitset);
-        for (int i = 0; i < lengthThis; i++) {
-            if (bits[i] == 1 && bitset.bits[i] == 0) {
-                throw new IllegalArgumentException("The first bitset is not a subset of the second");
-            }
-            if (bits[i] == 0 && bitset.bits[i] == 1) res.bits[i] = 1;
+        int i;
+        for (i = lengthBitset - 1; i >= lengthThis ; i--) {
+            res.bits[i] = bitset.bits[i];
         }
-        for (int i = lengthThis; i < lengthBitset; i++) {
-            if (bitset.bits[i] == 1) res.bits[i] = 1;
+        for (; i >= 0 ; i--) {
+            int el = bits[i];
+            if (el != (el & (bitset.bits[i] & ~(-1 << (int) (Math.log(el) / Math.log(2)) + 1))))
+                throw new IllegalArgumentException("The first bitset is not a subset of the second");
+            res.bits[i] = bitset.bits[i] - bits[i];
         }
         return res;
     }
 
     public boolean contains(int index) {
-        checkIndex(index);
-        return bits[index] != 0;
+        int ind = index >> 5;
+        checkIndex(ind);
+        return (bits[ind] & (1 << index)) != 0;
     }
 
     public boolean contains(int[] indexes) {
@@ -126,7 +123,7 @@ public class Bitset {
     }
 
     public int size() {
-        return size;
+        return size << 5;
     }
 
     public int length() {
@@ -149,7 +146,7 @@ public class Bitset {
     }
 
     private void checkIndex(int index) {
-        if (index < 0 || index >= size) throw new IllegalArgumentException("Invalid array index value");
+        if (index >= size || index < 0) throw new IllegalArgumentException("Invalid input data");
     }
 
     public void print() {
@@ -167,7 +164,7 @@ public class Bitset {
 
         @Override
         public boolean hasNext() {
-            return nextIndex() != size;
+            return nextIndex() != size << 5;
         }
 
         @Override
@@ -184,17 +181,17 @@ public class Bitset {
         }
 
         public int nextIndex() {
-            for (int i = index + 1; i < size; i++) {
-                if (bits[i] == 1) {
+            for (int i = index + 1; i < size << 5; i++) {
+                if (((bits[i >> 5] >> i) & 1) == 1) {
                     return i;
                 }
             }
-            return size;
+            return size * 32;
         }
 
         public int previousIndex() {
             for (int i = index - 1; i >= 0; i--) {
-                if (bits[i] == 1) {
+                if (((bits[i >> 5] >> i) & 1) == 1) {
                     return i;
                 }
             }
@@ -202,7 +199,7 @@ public class Bitset {
         }
 
         private Integer nextOrPrevious(int i) {
-            if (i != size && i != -1) {
+            if (i != size << 5 && i != -1) {
                 index = i;
                 return i;
             }
@@ -211,14 +208,16 @@ public class Bitset {
 
         @Override
         public void remove() {
-            if (index != -1 && bits[index] == 1) {
-                bits[index] = 0;
+            if (index != -1 && ((bits[index >> 5] >> index) & 1) == 1) {
+                bits[index >> 5] &= ~(1 << index);
             } else throw new IllegalStateException("The next method has not yet been called, or the remove method " +
                     "has already been called after the last call to the next method");
         }
 
         public void add() {
-            if (index < size - 1 && bits[index + 1] == 0) bits[index + 1] = 1;
+            if (index < size << 5 - 1 && ((bits[(index + 1) >> 5] >> (index + 1)) & 1) == 0) {
+                bits[(index + 1) >> 5] |= 1 << (index + 1);
+            }
             else throw new IllegalStateException("Cannot add a new element int the iteration");
         }
     }

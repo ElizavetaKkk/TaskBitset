@@ -68,13 +68,4 @@ public class BitsetTest {
         Assert.assertTrue(bitsetTest1.contains(new int[]{8, 2, 7}));
         Assert.assertFalse(bitsetTest2.contains(new int[]{0, 1, 2}));
     }
-
-    @Test
-    public void length() {
-        Bitset bitsetTest = new Bitset(5);
-        bitsetTest.set(1); bitsetTest.set(2);
-        Assert.assertEquals(3, bitsetTest.length());
-        Assert.assertEquals(9, bitsetTest2.length());
-        Assert.assertEquals(0, new Bitset(7).length());
-    }
 }

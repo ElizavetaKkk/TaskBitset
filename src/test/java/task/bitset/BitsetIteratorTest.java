@@ -25,7 +25,7 @@ public class BitsetIteratorTest {
         iterator.next();
         Assert.assertEquals(2, iterator.nextIndex());
         iterator.next(); iterator.next(); iterator.next();
-        Assert.assertEquals(7, iterator.nextIndex());
+        Assert.assertEquals(32, iterator.nextIndex());
     }
 
     @Test
